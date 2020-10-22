@@ -4,17 +4,18 @@ from Player import *
 vec2 = pg.math.Vector2
 
 class Game:
-    def __init__(self):      
+    def __init__(self):    
         #game setings
         self.game_run = False
         self.SCREEN_WIDTH = 800
         self.SCREEN_HEIGHT = 600
         self.FPS = 60
         self.clock = pg.time.Clock()
+        self.last_time = 0
 
         #init pygame and screen
         pg.init()
-        pg.display.set_caption("Animation")   
+        pg.display.set_caption("Cow Farm")
         self.screen = pg.display.set_mode((self.SCREEN_WIDTH,self.SCREEN_HEIGHT))
 
         #load all images
@@ -23,18 +24,27 @@ class Game:
         #all create players
         self.create_players()
 
+
     def start_new_game(self):
-        self.clock.tick(self.FPS)             
+        self.clock.tick(self.FPS)       
         self.game_loop()
 
     def game_loop(self):
         self.game_run = True
         while self.game_run:
+            #force game to to run in 60 FPS
             self.clock.tick(self.FPS)
+
+            #cound elapsed time betwen each frame
+            current = pg.time.get_ticks()
+            elapsed = (current - self.last_time) * 0.001
+
             self.proces_events()
-            self.update()
+            self.update(elapsed)
             self.draw()
             pg.display.update()
+
+            self.last_time = current
 
     def load_data(self):
         #path to img folder
@@ -58,8 +68,8 @@ class Game:
 
     def create_players(self):
         self.all_players = []
-        self.cow = Player(self, 'Cow', (400, 500), False)
-        self.cow_black = Player(self, 'CowBlack', (600, 500), True)
+        self.cow = Player(self, 'Cow', vec2(400, 500), True)
+        self.cow_black = Player(self, 'CowBlack', vec2(600, 500), False)
 
         self.all_players.append(self.cow)
         self.all_players.append(self.cow_black)
@@ -74,11 +84,10 @@ class Game:
             elif event.type == pg.KEYDOWN:
                 if event.key == pg.K_ESCAPE:
                     pg.quit()
-        pg.display.update()
 
-    def update(self):
+    def update(self,elapsed):
         for player in self.all_players:
-            player.update_animation()
+            player.update(elapsed)
 
     def draw(self):
         #draw background
@@ -93,3 +102,4 @@ class Game:
 if __name__ == "__main__":
     game = Game()
     game.start_new_game()
+    
