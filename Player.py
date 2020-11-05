@@ -115,7 +115,6 @@ class Player(pg.sprite.Sprite):
         if self.update_state == False and not self.jump :
             self.player_state = "IDLE"
 
-        print("pos", self.pos)
 
 
     def animation(self):
