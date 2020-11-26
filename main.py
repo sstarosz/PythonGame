@@ -1,6 +1,8 @@
 import os
+import sys
 import pygame as pg
 from Player import *
+from Background import *
 vec2 = pg.math.Vector2
 
 class Game:
@@ -12,22 +14,47 @@ class Game:
         self.FPS = 60
         self.clock = pg.time.Clock()
         self.last_time = 0
+        self.font_name = pg.font.match_font('arial')
 
         #init pygame and screen
         pg.init()
         pg.display.set_caption("Cow Farm")
         self.screen = pg.display.set_mode((self.SCREEN_WIDTH,self.SCREEN_HEIGHT))
 
+        #background
+        self.background = None
+
+        #all players tab
+        self.all_players = []
+
+        self.platforms_tab = []
+        self.all_platforms = pg.sprite.Group() #platfroms array
+
         #load all images
         self.load_data()
 
-        #all create players
-        self.create_players()
 
+    def start_new_game(self):   
+        self.screen.fill((26, 145, 28))
+        self.draw_text("KROWY", 48, (255,255,255), self.SCREEN_WIDTH / 2, self.SCREEN_HEIGHT / 4)
+        self.draw_text("Arrows to move, Space to jump", 22, (255,255,255), self.SCREEN_WIDTH / 2, self.SCREEN_HEIGHT / 2)
+        self.draw_text("Press a key to play", 22,(255,255,255), self.SCREEN_WIDTH / 2, self.SCREEN_HEIGHT / 2 + 22)
+        pg.display.flip()
+        self.wait_for_key()
+        pg.mixer.music.fadeout(500)
 
-    def start_new_game(self):
-        self.clock.tick(self.FPS)       
         self.game_loop()
+
+    def wait_for_key(self):
+        waiting = True
+        while waiting:
+            self.clock.tick(self.FPS)
+            for event in pg.event.get():
+                if event.type == pg.QUIT:
+                    waiting = False
+                    self.running = False
+                if event.type == pg.KEYUP:
+                    waiting = False
 
     def game_loop(self):
         self.game_run = True
@@ -35,13 +62,18 @@ class Game:
             #force game to to run in 60 FPS
             self.clock.tick(self.FPS)
 
+            player_position = self.all_players[0].pos
+            offset_x = 0
+            if player_position.x > 600:
+                offset_x = int(player_position.x - 600)
+  
             #cound elapsed time betwen each frame
             current = pg.time.get_ticks()
             elapsed = (current - self.last_time) * 0.001
 
             self.proces_events()
-            self.update(elapsed)
-            self.draw()
+            self.update(elapsed,offset_x)
+            self.draw(offset_x)
             pg.display.update()
 
             self.last_time = current
@@ -51,25 +83,45 @@ class Game:
         self.img_directory = os.path.join(os.path.dirname(__file__), 'img')
         
         #path to sprite and background file
-        self.background_image = os.path.join(self.img_directory,'background.png')
-        self.cow_sprite_path =  os.path.join(self.img_directory,'cow.png')
-        self.cow_black_sprite_path =  os.path.join(self.img_directory,'cow_dark.png')
+        background_image = os.path.join(self.img_directory,'background.png')
+        background_tree_path = os.path.join(self.img_directory,'tree.png')
+        cow_sprite_path =  os.path.join(self.img_directory,'cow2.png')
+        cow_black_sprite_path =  os.path.join(self.img_directory,'cow_dark2.png')
+        fruit_path = os.path.join(self.img_directory, 'Fruit.png')
+        platform_path = os.path.join(self.img_directory, 'Platforms.png')
+        
+        ##Create Backgorund
+        self.background = Background(self,background_image)
+        background_tree = Background_Object(self,background_tree_path)
+        self.background.add_object(background_tree)
+        
+        ##Create Platforms
+        platform_localization = [[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+                                [0,0,0,16,17,18,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+                                [16,17,18,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+                                [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,16,17,18,0,0,0,0,0,0],
+                                [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+                                [0,0,0,0,0,0,0,0,0,0,0,0,0,1,2,3,0,0,0,16,17,18,0,0,0],
+                                [0,0,0,0,0,0,0,0,0,0,1,2,11,5,5,5,1,0,0,0,0,0,16,17,18],
+                                [0,1,2,3,0,0,0,1,2,11,5,5,5,5,5,5,5,1,0,0,0,0,0,0,0]]
 
-        #load background image
-        self.background_image = pg.image.load(self.background_image).convert()
 
-        #load sprites  
-        self.player_sprite = {}   
-        cow_sprite = Spritesheet(self.cow_sprite_path )
-        cow_black_sprite = Spritesheet(self.cow_black_sprite_path)
+        for k in range(len(platform_localization)):
+            for x in range(len(platform_localization[k])):
+                if platform_localization[k][x] == 0:
+                    continue
+                position = ((x * 64 + 32),k * 64 +52)
+                platform = Platform(self,Spritesheet(platform_path),position,(platform_localization[k][x] - 1))
+                self.all_platforms.add(platform)
 
-        self.player_sprite['Cow'] = cow_sprite
-        self.player_sprite['CowBlack'] = cow_black_sprite
 
-    def create_players(self):
-        self.all_players = []
-        self.cow = Player(self, 'Cow', vec2(400, 500), True)
-        self.cow_black = Player(self, 'CowBlack', vec2(600, 500), False)
+        ##Create Players
+        #load  player sprites  
+        cow_sprite = Spritesheet(cow_sprite_path )
+        cow_black_sprite = Spritesheet(cow_black_sprite_path)
+
+        self.cow = Player(self, cow_sprite, vec2(400, 500), True)
+        self.cow_black = Player(self, cow_black_sprite, vec2(100, 120), False)
 
         self.all_players.append(self.cow)
         self.all_players.append(self.cow_black)
@@ -82,22 +134,83 @@ class Game:
                 pg.quit()
                 exit()
             elif event.type == pg.KEYDOWN:
+                if event.key == pg.K_SPACE:
+                    self.all_players[0].jump = True
+ 
                 if event.key == pg.K_ESCAPE:
                     pg.quit()
+                    exit()
+            elif event.type == pg.KEYUP:
+                if event.key == pg.K_SPACE:
+                     self.all_players[0].jump = False
 
-    def update(self,elapsed):
+        #parse user input
         for player in self.all_players:
-            player.update(elapsed)
+            if player.player:
+                player.control()
 
-    def draw(self):
-        #draw background
-        self.screen.blit(self.background_image,(0,0))
+    def update(self,elapsed,offset_x):
+
+        colision_tolerance = 20
+        player_rect = self.all_players[0].rect.copy()
+        for platform in self.all_platforms:
+            if  player_rect.colliderect(platform.rect):
+
+                #Colision Y asix up
+                if abs(platform.rect.top - self.all_players[0].rect.bottom) < colision_tolerance and self.all_players[0].vel.y > 0:
+                    player_rect.bottom = platform.rect.top 
+                    self.all_players[0].pos.y = platform.rect.top
+                    self.all_players[0].vel.y = 0
+
+                #Colision Y asix down
+                if abs(platform.rect.bottom - self.all_players[0].rect.top) < colision_tolerance and self.all_players[0].vel.y < 0:
+                    player_rect.top = platform.rect.bottom
+                    self.all_players[0].pos.y = platform.rect.bottom + player_rect.height
+                    self.all_players[0].vel.y = 0
+
+                   
+                if  player_rect.colliderect(platform.rect):
+                    #Colision X asix right
+                    if abs(platform.rect.right - self.all_players[0].rect.left) < colision_tolerance and self.all_players[0].vel.x < 0:
+                        self.all_players[0].pos.x = platform.rect.right + int(round(player_rect.width / 2))
+                        self.all_players[0].vel.x = 0    
+
+                    #Colision X asix left
+                    if abs(platform.rect.left - self.all_players[0].rect.right) < colision_tolerance and self.all_players[0].vel.x > 0:
+                        self.all_players[0].pos.x = platform.rect.left - int(round(player_rect.width / 2))
+                        self.all_players[0].vel.x = 0   
+
+        #colision with floor
+        floor = pg.Rect(0,500,999999999,1)
+        for player in self.all_players:
+            floor_hits = floor.colliderect(player.rect)
+
+            if floor_hits:
+                player.pos.y = 500
+                player.vel.y = 0
+
+        #update playerss
+        for player in self.all_players:
+            player.update()
+
+    def draw(self,offset_x):
+        self.screen.fill((0,0,0))
+        self.background.draw(offset_x*0.33)
 
         #draw all players
         for player in self.all_players:
-            player.draw()
+            player.draw(offset_x)
+ 
+        for platform in self.all_platforms:
+            platform.draw(offset_x)
 
 
+    def draw_text(self, text, size, color, x, y):
+            font = pg.font.Font(self.font_name, size)
+            text_surface = font.render(text, True, color)
+            text_rect = text_surface.get_rect()
+            text_rect.midtop = (int(round(x)), int(round((y))))
+            self.screen.blit(text_surface, text_rect)
 
 if __name__ == "__main__":
     game = Game()

@@ -13,21 +13,20 @@ class Spritesheet:
         return image
 
 class Player(pg.sprite.Sprite):
-    def __init__(self,game,name,pos,playable):
+    def __init__(self,game,sprite,pos,playable):
         pg.sprite.Sprite.__init__(self)
         self.game = game
         self.player = playable
-        self.spritesheet = self.game.player_sprite[name]
-        self.image = self.spritesheet.get_image(33, 25, 99, 119)
+        self.spritesheet = sprite
 
         #position
-        self.rect = self.image.get_rect()
+        self.rect = pg.Rect(0,0,159,159)
 
         self.jump = False
-        self.pos = pos
+        self.pos = pos      #vec2
         self.acc = vec2(0,0)
-        self.vel = vec2(0, 160)
-        self.GRAVITY = vec2(0,-160)
+        self.vel = vec2(0,0)
+        self.GRAVITY = 0.8
         self.flip_h = False
 
         #player sprite image group
@@ -39,6 +38,7 @@ class Player(pg.sprite.Sprite):
         self.idle_frames = []
         self.load_frames()
 
+        #Action, table that store all image frames, frame rate to play up animation
         self.player_state_frames = {
             "WALK_LEFT": (self.move_left_right_frames, 180),
             "WALK_RIGHT": (self.move_left_right_frames, 180),
@@ -54,24 +54,7 @@ class Player(pg.sprite.Sprite):
         self.player_state = "IDLE"
         self.walk_speed = 80
 
-
-    def set_position(self,new_pos):
-        self.pos = new_pos
-
-    def get_position(self):
-        return self.pos
-
-    def set_x_position(self,new_x):
-        self.pos.x = new_x
-
-    def set_y_position(self,new_y):
-            self.pos.y = new_y
-
-    def update(self, elapsed_time):
-
-        #parse user input
-        if self.player:
-            self.control(elapsed_time)
+    def update(self):
         
         # update animation
         actual_time = pg.time.get_ticks()
@@ -79,8 +62,8 @@ class Player(pg.sprite.Sprite):
             self.animation()
             self.last_update = actual_time
 
-
-    def control(self,elapsed_time):
+    def control(self):
+        self.acc = vec2(0,0.8) #0.8 player gravity
         #parse user input
         self.update_state = False
         keys = pg.key.get_pressed()
@@ -89,33 +72,34 @@ class Player(pg.sprite.Sprite):
             self.update_state = True
             self.flip_h = True
             self.player_state = "WALK_LEFT"
-            self.set_x_position(self.pos.x - self.walk_speed * elapsed_time)
+            self.acc.x = -0.6
 
         if  keys[pg.K_RIGHT]:
             self.update_state = True
             self.flip_h = False
             self.player_state = "WALK_RIGHT"
-            self.set_x_position(self.pos.x + self.walk_speed * elapsed_time)
+            self.acc.x = 0.6
 
-        if keys[pg.K_SPACE]:
-            self.jump = True
+        if self.jump and self.vel.y == 0:
+            self.jump = False
+            self.vel.y = -17
 
         if keys[pg.K_q]:
             self.update_state = True
             self.player_state = "TONGUE"
 
-        if self.jump:
-            self.pos -= self.vel * elapsed_time
-            self.vel += self.GRAVITY * elapsed_time
-            if self.pos.y > 500:
-                self.pos.y = 500
-                self.jump = False
-                self.vel = vec2(0, 160)
-
         if self.update_state == False and not self.jump :
             self.player_state = "IDLE"
 
+         # apply friction
+        self.acc.x += self.vel.x * (-0.12)
+        # equations of motion
+        self.vel += self.acc
+        if abs(self.vel.x) < 0.1:
+            self.vel.x = 0
+        self.pos += self.vel + 0.5 * self.acc
 
+        self.rect.midbottom = self.pos
 
     def animation(self):
         self.current_frame = (self.current_frame + 1) % len(self.player_state_frames[self.player_state][0])
@@ -127,35 +111,34 @@ class Player(pg.sprite.Sprite):
             self.image = pg.transform.flip(self.image, True, False)
 
         self.rect = self.image.get_rect()
-        self.rect.bottom = bottom
         self.rect.midbottom = self.pos
 
     def load_frames(self):
-        self.move_forward_frames = [self.spritesheet.get_image(0, 0, 159, 159),
-                                    self.spritesheet.get_image(160, 0, 159, 159),
-                                    self.spritesheet.get_image(320, 0, 159, 159),
-                                    self.spritesheet.get_image(480, 0, 159, 159)]
+        self.move_forward_frames = [self.spritesheet.get_image(35, 5, 94, 113),
+                                    self.spritesheet.get_image(195, 5, 94, 113),
+                                    self.spritesheet.get_image(355 , 5, 94, 113),
+                                    self.spritesheet.get_image(515, 5, 94, 113)]
 
-        self.move_left_right_frames = [self.spritesheet.get_image(0, 160, 159, 159),
-                                       self.spritesheet.get_image(160, 160, 159, 159),
-                                       self.spritesheet.get_image(320, 160, 159, 159),
-                                       self.spritesheet.get_image(480, 160, 159, 159)]
+        self.move_left_right_frames = [self.spritesheet.get_image(4, 123, 154, 113 ),
+                                       self.spritesheet.get_image(164, 123, 149, 113),
+                                       self.spritesheet.get_image(324, 123, 154, 113),
+                                       self.spritesheet.get_image(484, 123, 149, 113)]                            
 
-        self.move_back_frames = [self.spritesheet.get_image(0, 320, 159, 159),
-                                 self.spritesheet.get_image(160, 320, 159, 159),
-                                 self.spritesheet.get_image(320, 320, 159, 159),
-                                 self.spritesheet.get_image(480, 320, 159, 159)]
+        self.move_back_frames = [self.spritesheet.get_image(35, 241, 94, 113),
+                                 self.spritesheet.get_image(190, 241, 94, 113),
+                                 self.spritesheet.get_image(350, 241, 94, 113),
+                                 self.spritesheet.get_image(510, 241, 94, 113)]
 
-        self.sleep_framse = [self.spritesheet.get_image(160, 640, 159, 159),
-                             self.spritesheet.get_image(0, 480, 159, 159),
-                             self.spritesheet.get_image(160, 480, 159, 159),]
+        self.sleep_framse = [self.spritesheet.get_image(190, 482, 94, 113),
+                             self.spritesheet.get_image(32, 359, 94, 118),
+                             self.spritesheet.get_image(192, 359, 94, 118),]
 
-        self.utility_frames = [self.spritesheet.get_image(160, 640, 159, 159),
-                               self.spritesheet.get_image(320, 640, 159, 159),
-                               self.spritesheet.get_image(480, 640, 159, 159)]
+        self.utility_frames = [self.spritesheet.get_image(190, 482, 94, 113),
+                               self.spritesheet.get_image(350, 487, 94, 113),
+                               self.spritesheet.get_image(510, 487, 94, 110)]
 
-        self.idle_frames = [self.spritesheet.get_image(0, 640, 159, 159)]
+        self.idle_frames = [self.spritesheet.get_image(30, 482, 94, 113)]
 
-    def draw(self):
-        self.game.screen.blit(self.image,self.rect)
-       
+    def draw(self,offset):
+        rect_offset = self.rect.move(-offset,0)
+        self.game.screen.blit(self.image,rect_offset)
