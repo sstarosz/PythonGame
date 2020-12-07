@@ -17,6 +17,8 @@ class Game:
         self.font_name = pg.font.match_font('arial')
 
         #init pygame and screen
+        pg.mixer.pre_init(48000, -16, 1, 1024)
+        pg.mixer.init()
         pg.init()
         pg.display.set_caption("Cow Farm")
         self.screen = pg.display.set_mode((self.SCREEN_WIDTH,self.SCREEN_HEIGHT))
@@ -30,8 +32,12 @@ class Game:
         self.platforms_tab = []
         self.all_platforms = pg.sprite.Group() #platfroms array
 
+        #audio array
+        self.Sounds = {}
+
         #load all images
         self.load_data()
+
 
 
     def start_new_game(self):   
@@ -57,11 +63,13 @@ class Game:
                     waiting = False
 
     def game_loop(self):
+        self.Sounds['Backgournd'].play(loops=-1,maxtime = 0, fade_ms = 500)
         self.game_run = True
         while self.game_run:
             #force game to to run in 60 FPS
             self.clock.tick(self.FPS)
 
+            ## cound player offset
             player_position = self.all_players[0].pos
             offset_x = 0
             if player_position.x > 600:
@@ -72,16 +80,32 @@ class Game:
             elapsed = (current - self.last_time) * 0.001
 
             self.proces_events()
-            self.update(elapsed,offset_x)
+            self.update()
             self.draw(offset_x)
             pg.display.update()
 
+            #update time
             self.last_time = current
+            self.last_pos_y = -1000
 
     def load_data(self):
         #path to img folder
         self.img_directory = os.path.join(os.path.dirname(__file__), 'img')
+        self.sound_directory = os.path.join(os.path.dirname(__file__),'sound')
         
+        ##audio read
+        background_song_path = os.path.join(self.sound_directory, 'Happy Tune.ogg')
+        jump_song_path = os.path.join(self.sound_directory, 'Jump33.wav')
+        moo_song_path = os.path.join(self.sound_directory, 'Cow-moo-sound.wav')
+        hit_song_path = os.path.join(self.sound_directory, 'hit_ground.wav')
+
+
+        self.Sounds['Backgournd'] = pg.mixer.Sound(background_song_path)
+        self.Sounds['Jump'] =  pg.mixer.Sound(jump_song_path)
+        self.Sounds['Moo'] = pg.mixer.Sound(moo_song_path)
+        self.Sounds['Hit'] = pg.mixer.Sound(hit_song_path)
+        self.Sounds['Hit'].set_volume(0.5)
+
         #path to sprite and background file
         background_image = os.path.join(self.img_directory,'background.png')
         background_tree_path = os.path.join(self.img_directory,'tree.png')
@@ -114,13 +138,12 @@ class Game:
                 platform = Platform(self,Spritesheet(platform_path),position,(platform_localization[k][x] - 1))
                 self.all_platforms.add(platform)
 
-
         ##Create Players
         #load  player sprites  
         cow_sprite = Spritesheet(cow_sprite_path )
         cow_black_sprite = Spritesheet(cow_black_sprite_path)
 
-        self.cow = Player(self, cow_sprite, vec2(400, 500), True)
+        self.cow = Player(self, cow_sprite, vec2(380, 501), True)
         self.cow_black = Player(self, cow_black_sprite, vec2(100, 120), False)
 
         self.all_players.append(self.cow)
@@ -149,36 +172,45 @@ class Game:
             if player.player:
                 player.control()
 
-    def update(self,elapsed,offset_x):
-
+    def update(self):                   
+        self.all_players[0].hit = False
         colision_tolerance = 20
         player_rect = self.all_players[0].rect.copy()
         for platform in self.all_platforms:
             if  player_rect.colliderect(platform.rect):
-
-                #Colision Y asix up
-                if abs(platform.rect.top - self.all_players[0].rect.bottom) < colision_tolerance and self.all_players[0].vel.y > 0:
-                    player_rect.bottom = platform.rect.top 
-                    self.all_players[0].pos.y = platform.rect.top
-                    self.all_players[0].vel.y = 0
-
-                #Colision Y asix down
-                if abs(platform.rect.bottom - self.all_players[0].rect.top) < colision_tolerance and self.all_players[0].vel.y < 0:
-                    player_rect.top = platform.rect.bottom
-                    self.all_players[0].pos.y = platform.rect.bottom + player_rect.height
-                    self.all_players[0].vel.y = 0
-
+                if self.all_players[0].vel.y > 0:
+                    #Colision Y asix up
+                    if abs(platform.rect.top - self.all_players[0].rect.bottom) < colision_tolerance and self.all_players[0].vel.y > 0:
+                        player_rect.bottom = platform.rect.top 
+                        self.all_players[0].pos.y = platform.rect.top
+                        self.last_pos_y = platform.rect.top
+                        self.all_players[0].vel.y = 0
+                        self.all_players[0].hit = True
+       
+                    #Colision Y asix down
+                    if abs(platform.rect.bottom - self.all_players[0].rect.top) < colision_tolerance and self.all_players[0].vel.y < 0:                      
+                        player_rect.top = platform.rect.bottom
+                        self.all_players[0].pos.y = platform.rect.bottom + player_rect.height
+                        self.last_pos_y = platform.rect.bottom + player_rect.height
+                        self.all_players[0].vel.y = 0   
+                        self.all_players[0].hit = True          
                    
                 if  player_rect.colliderect(platform.rect):
                     #Colision X asix right
                     if abs(platform.rect.right - self.all_players[0].rect.left) < colision_tolerance and self.all_players[0].vel.x < 0:
+                        if not pg.mixer.Channel(2).get_busy():
+                            pg.mixer.Channel(2).play(self.Sounds['Hit'])
                         self.all_players[0].pos.x = platform.rect.right + int(round(player_rect.width / 2))
                         self.all_players[0].vel.x = 0    
 
                     #Colision X asix left
                     if abs(platform.rect.left - self.all_players[0].rect.right) < colision_tolerance and self.all_players[0].vel.x > 0:
+                        if not pg.mixer.Channel(3).get_busy():
+                             pg.mixer.Channel(3).play(self.Sounds['Hit'])
                         self.all_players[0].pos.x = platform.rect.left - int(round(player_rect.width / 2))
                         self.all_players[0].vel.x = 0   
+
+
 
         #colision with floor
         floor = pg.Rect(0,500,999999999,1)
@@ -188,6 +220,9 @@ class Game:
             if floor_hits:
                 player.pos.y = 500
                 player.vel.y = 0
+                self.all_players[0].hit = True
+
+
 
         #update playerss
         for player in self.all_players:

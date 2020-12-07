@@ -21,7 +21,8 @@ class Player(pg.sprite.Sprite):
 
         #position
         self.rect = pg.Rect(0,0,159,159)
-
+        self.hit = True
+        self.last_hit = True
         self.jump = False
         self.pos = pos      #vec2
         self.acc = vec2(0,0)
@@ -64,13 +65,19 @@ class Player(pg.sprite.Sprite):
 
     def control(self):
         self.acc = vec2(0,0.8) #0.8 player gravity
+
+        if not self.last_hit and self.hit:     
+            if not pg.mixer.Channel(1).get_busy():
+                print("hit")
+                pg.mixer.Channel(1).play(self.game.Sounds['Hit'])
+
         #parse user input
         self.update_state = False
         keys = pg.key.get_pressed()
 
         if keys[pg.K_LEFT]:
             self.update_state = True
-            self.flip_h = True
+            self.flip_h = True   
             self.player_state = "WALK_LEFT"
             self.acc.x = -0.6
 
@@ -81,10 +88,13 @@ class Player(pg.sprite.Sprite):
             self.acc.x = 0.6
 
         if self.jump and self.vel.y == 0:
+            if not pg.mixer.Channel(4).get_busy():
+                pg.mixer.Channel(4).play(self.game.Sounds['Jump'])
             self.jump = False
             self.vel.y = -17
 
         if keys[pg.K_q]:
+            self.game.Sounds['Moo'].play()
             self.update_state = True
             self.player_state = "TONGUE"
 
@@ -95,13 +105,19 @@ class Player(pg.sprite.Sprite):
         self.acc.x += self.vel.x * (-0.12)
         # equations of motion
         self.vel += self.acc
+
         if abs(self.vel.x) < 0.1:
             self.vel.x = 0
+
         self.pos += self.vel + 0.5 * self.acc
 
         self.rect.midbottom = self.pos
+        self.last_hit = self.hit
 
     def animation(self):
+
+
+
         self.current_frame = (self.current_frame + 1) % len(self.player_state_frames[self.player_state][0])
         bottom = self.rect.bottom
         self.image = self.player_state_frames[self.player_state][0][self.current_frame]
